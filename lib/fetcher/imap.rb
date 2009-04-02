@@ -14,6 +14,7 @@ module Fetcher
     # * <tt>:use_login</tt> - use LOGIN instead of AUTHENTICATE to connect (some IMAP servers, like GMail, do not support AUTHENTICATE)
     # * <tt>:processed_folder</tt> - if set to the name of a mailbox, messages will be moved to that mailbox instead of deleted after processing. The mailbox will be created if it does not exist.
     # * <tt>:error_folder:</tt> - the name of a mailbox where messages that cannot be processed (i.e., your receiver throws an exception) will be moved. Defaults to "bogus". The mailbox will be created if it does not exist.
+    # * <tt>:retries:</tt> - number of times to retry download before a message is marked erroneous
     def initialize(options={})
       @authentication = options.delete(:authentication) || 'PLAIN'
       @port = options.delete(:port) || PORT
@@ -21,6 +22,7 @@ module Fetcher
       @use_login = options.delete(:use_login)
       @processed_folder = options.delete(:processed_folder)
       @error_folder = options.delete(:error_folder) || 'bogus'
+      @retries = options.delete(:retries) || 1
       super(options)
     end
     
@@ -39,11 +41,16 @@ module Fetcher
       @connection.select('INBOX')
       @connection.uid_search(['ALL']).each do |uid|
         msg = @connection.uid_fetch(uid,'RFC822').first.attr['RFC822']
+        passes = 0
         begin
           process_message(msg)
           add_to_processed_folder(uid) if @processed_folder
         rescue
-          handle_bogus_message(msg)
+          if (passes += 1) >= @retries
+            handle_bogus_message(msg)
+          else
+            retry
+          end
         end
         # Mark message as deleted 
         @connection.uid_store(uid, "+FLAGS", [:Seen, :Deleted])
