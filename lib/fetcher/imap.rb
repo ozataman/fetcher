@@ -57,8 +57,9 @@ module Fetcher
       end
     end
     
-    # Store the message for inspection if the receiver errors
+    # Notify the receiver and store the message for inspection if the receiver errors
     def handle_bogus_message(message)
+      notify_receiver_with_exception(message)
       create_mailbox(@error_folder)
       @connection.append(@error_folder, message)
     end

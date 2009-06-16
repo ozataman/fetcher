@@ -59,5 +59,12 @@ module Fetcher
     def handle_bogus_message(message) #:nodoc:
       raise NotImplementedError, "This method should be overridden by subclass"
     end
+    
+    # Send exception details to the receiver if it wants to know
+    def notify_receiver_with_exception(message)
+      if @receiver.respond_to?(:handle_fetcher_exception)
+        @respond_to.handle_fetcher_exception(message, $!, $@)
+      end
+    end
   end
 end
